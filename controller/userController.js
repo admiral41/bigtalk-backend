@@ -1,14 +1,15 @@
 const { sendEmail } = require("../middleware/sendMail");
 const User = require("../model/userModel");
 const crypto = require("crypto");
+const Activity = require("../model/activityModel");
 
 const registerUser = async (req, res) => {
   try {
     console.log(req.body);
-    const { name, email, password } = req.body;
+    const { name, email, password,username } = req.body;
 
     //Step 3 : validate the incoming data
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !username) {
       return res.json({
         success: false,
         message: "Please enter all fields.",
@@ -22,6 +23,7 @@ const registerUser = async (req, res) => {
       name,
       email,
       password,
+      username,
       avatar: { public_id: "sample_id", url: "sample_url" },
     });
     //use this to direct login after register
@@ -45,6 +47,7 @@ const registerUser = async (req, res) => {
   }
 };
 const loginUser = async (req, res) => {
+  console.log(req.body);
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email }).select("+password");
@@ -220,6 +223,76 @@ const searchUserByName = async (req, res) => {
     });
 }
 };
+const followUser = async (req, res) => {
+  try {
+    const userToFollow = await User.findById(req.params.id);
+    const loggedInUser = await User.findById(req.user._id);
+
+    if (!userToFollow) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check if the user is trying to follow themselves
+    if (loggedInUser._id.equals(userToFollow._id)) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot follow yourself",
+      });
+    }
+
+    if (loggedInUser.following.includes(userToFollow._id)) {
+      // If already following, unfollow
+      const indexFollowing = loggedInUser.following.indexOf(userToFollow._id);
+      const indexFollowers = userToFollow.followers.indexOf(loggedInUser._id);
+
+      loggedInUser.following.splice(indexFollowing, 1);
+      userToFollow.followers.splice(indexFollowers, 1);
+
+      await loggedInUser.save();
+      await userToFollow.save();
+
+      // Remove activity from the target user's activities
+      await Activity.deleteOne({
+        user: userToFollow._id, // Changed this line to targetUser
+        actionType: "follow",
+        targetUser: req.user._id, // Changed this line to the user who initiated the action
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "User Unfollowed",
+      });
+    } else {
+      // If not following, follow
+      loggedInUser.following.push(userToFollow._id);
+      userToFollow.followers.push(loggedInUser._id);
+
+      await loggedInUser.save();
+      await userToFollow.save();
+
+      // Create activity for the target user
+      await Activity.create({
+        user: userToFollow._id, // Changed this line to targetUser
+        actionType: "following",
+        targetUser: req.user._id, // Changed this line to the user who initiated the action
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "User followed",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -227,4 +300,5 @@ module.exports = {
   forgotPassword,
   resetPassword,
   searchUserByName,
+  followUser
 };

@@ -37,11 +37,13 @@ app.use(express.json());
 
 const user=require('./routes/userRoutes');
 const post = require('./routes/postRoutes');
+const activity = require('./routes/activityRoutes');
 
 // using routes
 
 app.use('/api/v1',user);
 app.use('/api/v1',post);
+app.use('/api/v1',activity);
 
 
 

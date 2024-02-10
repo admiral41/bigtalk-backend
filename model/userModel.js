@@ -7,6 +7,9 @@ const userSchema = new mongoose.Schema({
     type: String,
     require: [true, "Please enter your name"],
   },
+  username: {
+    type: String,
+  },
   avatar: {
     public_id: String,
     url: String,
